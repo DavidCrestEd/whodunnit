@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>The Case of the Missing Meaning</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+<script defer src="https://pyscript.net/latest/pyscript.js"></script>
+<style>
+    body {
+        background-color: #111;
+        color: #f0f0f0;
+        font-family: 'Segoe UI', sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+    header {
+        background-color: #222;
+        padding: 15px;
+        text-align: center;
+        border-bottom: 2px solid #444;
+    }
+    header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #ffdd55;
+    }
+    #game {
+        max-width: 900px;
+        margin: auto;
+        padding: 20px;
+    }
+    .casefile {
+        background: #1e1e1e;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #555;
+    }
+    .quote {
+        font-style: italic;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+    .suspects {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .suspect {
+        background: #333;
+        padding: 10px 15px;
+        border-radius: 6px;
+        cursor: pointer;
+        flex: 1 1 40%;
+        border: 1px solid #555;
+        text-align: center;
+        transition: background 0.2s;
+    }
+    .suspect:hover {
+        background: #444;
+    }
+    #feedback {
+        margin-top: 20px;
+        font-weight: bold;
+    }
+    #scoreboard {
+        margin-top: 20px;
+    }
+    button {
+        padding: 10px 15px;
+        background: #ffdd55;
+        border: none;
+        color: #111;
+        font-weight: bold;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #ffcc00;
+    }
+</style>
+</head>
+<body>
+<header>
+    <h1>🕵️ The Case of the Missing Meaning</h1>
+    <p>Identify the stylistic feature and its effect to solve each case.</p>
+</header>
+<div id="game">
+    <div id="case" class="casefile"></div>
+    <div id="suspects" class="suspects"></div>
+    <div id="feedback"></div>
+    <div id="scoreboard"></div>
+    <div style="margin-top: 20px;">
+        <button id="nextBtn" style="display:none;">Next Case</button>
+    </div>
+</div>
+
+<py-config>
+packages = []
+</py-config>
+
+<py-script>
+import random
+from pyscript import Element
+
+# Data structure: each case is a dict with 'quote', 'feature', 'effect', and 'decoys'
+cases = [
+    {
+        "quote": "The city was a sleeping beast under the fog.",
+        "feature": "Metaphor",
+        "effect": "Creates a sense of danger and latent energy.",
+        "decoys": [
+            ("Personification", "Gives human qualities to the city to make it relatable."),
+            ("Imagery", "Appeals to the reader's senses for vividness."),
+            ("Simile", "Directly compares two things using 'like' or 'as'.")
+        ]
+    },
+    {
+        "quote": "Her smile was as bright as the morning sun.",
+        "feature": "Simile",
+        "effect": "Conveys warmth and positivity through comparison.",
+        "decoys": [
+            ("Metaphor", "Suggests one thing is another to deepen meaning."),
+            ("Tone", "Sets the emotional attitude of the text."),
+            ("Alliteration", "Repeats initial consonant sounds for rhythm.")
+        ]
+    },
+    {
+        "quote": "The silence screamed louder than any words.",
+        "feature": "Irony",
+        "effect": "Contradicts expectation to highlight tension.",
+        "decoys": [
+            ("Hyperbole", "Exaggerates for dramatic effect."),
+            ("Imagery", "Appeals to the reader's senses."),
+            ("Personification", "Gives human actions to non-human things.")
+        ]
+    },
+    {
+        "quote": "We shall fight on the beaches, we shall fight on the landing grounds...",
+        "feature": "Repetition",
+        "effect": "Emphasises determination and resilience.",
+        "decoys": [
+            ("Parallelism", "Uses similar grammatical structures for balance."),
+            ("Tone", "Sets the speech's emotional attitude."),
+            ("Anaphora", "Repeats a word/phrase at the start of clauses.")
+        ]
+    },
+    {
+        "quote": "A sudden chill ran down his spine.",
+        "feature": "Imagery",
+        "effect": "Appeals to the sense of touch to evoke fear.",
+        "decoys": [
+            ("Metaphor", "Compares without 'like' or 'as'."),
+            ("Tone", "Establishes emotional stance."),
+            ("Personification", "Gives human traits to non-human things.")
+        ]
+    }
+]
+
+score = 0
+current_case = None
+attempts = 0
+cases_played = 0
+
+def load_case():
+    global current_case, attempts
+    attempts = 0
+    Element("feedback").write("")
+    Element("nextBtn").element.style.display = "none"
+    current_case = random.choice(cases)
+    Element("case").write(f"<div class='quote'>\"{current_case['quote']}\"</div><p>Which stylistic feature is at work here?</p>")
+    suspects = [(current_case["feature"], current_case["effect"])] + current_case["decoys"]
+    random.shuffle(suspects)
+    buttons_html = "".join([f"<div class='suspect' onclick='select_suspect(\"{f}\", \"{e}\")'><b>{f}</b><br><small>{e}</small></div>" for f, e in suspects])
+    Element("suspects").write(buttons_html)
+
+def select_suspect(feature, effect):
+    global score, attempts, cases_played
+    attempts += 1
+    if feature == current_case["feature"]:
+        points = 3 if attempts == 1 else 1
+        score += points
+        cases_played += 1
+        Element("feedback").write(f"✅ Correct! This is <b>{feature}</b>. Effect: {current_case['effect']} (+{points} points)")
+        Element("nextBtn").element.style.display = "inline-block"
+    else:
+        if attempts < 2:
+            Element("feedback").write(f"❌ Not quite. Try again.")
+        else:
+            cases_played += 1
+            Element("feedback").write(f"❌ Wrong. The answer was <b>{current_case['feature']}</b>. Effect: {current_case['effect']}")
+            Element("nextBtn").element.style.display = "inline-block"
+    Element("scoreboard").write(f"Score: {score} | Cases solved: {cases_played}")
+
+# Expose to JS so onclick works
+from js import window
+window.select_suspect = select_suspect
+
+def next_case(evt=None):
+    if cases_played >= 5:
+        Element("case").write("<h2>Case Files Closed</h2><p>Well done, detective!</p>")
+        Element("suspects").write("")
+        Element("feedback").write(f"Final Score: {score} points")
+        Element("nextBtn").element.style.display = "none"
+    else:
+        load_case()
+
+Element("nextBtn").element.addEventListener("click", next_case)
+
+load_case()
+</py-script>
+</body>
+</html>
