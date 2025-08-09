@@ -1,110 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>The Case of the Missing Meaning</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
-<script defer src="https://pyscript.net/latest/pyscript.js"></script>
-<style>
-    body {
-        background-color: #111;
-        color: #f0f0f0;
-        font-family: 'Segoe UI', sans-serif;
-        margin: 0;
-        padding: 0;
-    }
-    header {
-        background-color: #222;
-        padding: 15px;
-        text-align: center;
-        border-bottom: 2px solid #444;
-    }
-    header h1 {
-        margin: 0;
-        font-size: 1.5rem;
-        color: #ffdd55;
-    }
-    #game {
-        max-width: 900px;
-        margin: auto;
-        padding: 20px;
-    }
-    .casefile {
-        background: #1e1e1e;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border: 1px solid #555;
-    }
-    .quote {
-        font-style: italic;
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-    }
-    .suspects {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .suspect {
-        background: #333;
-        padding: 10px 15px;
-        border-radius: 6px;
-        cursor: pointer;
-        flex: 1 1 40%;
-        border: 1px solid #555;
-        text-align: center;
-        transition: background 0.2s;
-    }
-    .suspect:hover {
-        background: #444;
-    }
-    #feedback {
-        margin-top: 20px;
-        font-weight: bold;
-    }
-    #scoreboard {
-        margin-top: 20px;
-    }
-    button {
-        padding: 10px 15px;
-        background: #ffdd55;
-        border: none;
-        color: #111;
-        font-weight: bold;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    button:hover {
-        background: #ffcc00;
-    }
-</style>
-</head>
-<body>
-<header>
-    <h1>🕵️ The Case of the Missing Meaning</h1>
-    <p>Identify the stylistic feature and its effect to solve each case.</p>
-</header>
-<div id="game">
-    <div id="case" class="casefile"></div>
-    <div id="suspects" class="suspects"></div>
-    <div id="feedback"></div>
-    <div id="scoreboard"></div>
-    <div style="margin-top: 20px;">
-        <button id="nextBtn" style="display:none;">Next Case</button>
-    </div>
-</div>
-
-<py-config>
-packages = []
-</py-config>
-
-<py-script>
 import random
 from pyscript import Element
+from js import window
 
-# Data structure: each case is a dict with 'quote', 'feature', 'effect', and 'decoys'
+# ----- DATA -----
 cases = [
     {
         "quote": "The city was a sleeping beast under the fog.",
@@ -158,43 +56,76 @@ cases = [
     }
 ]
 
+# ----- STATE -----
 score = 0
 current_case = None
 attempts = 0
 cases_played = 0
+round_over = False  # <-- NEW
+
+# Optionally keep track of used cases to avoid repeats in one session
+unused = cases.copy()
+
+def refresh_score():
+    Element("scoreboard").write(f"Score: {score} | Cases solved: {cases_played}")
 
 def load_case():
-    global current_case, attempts
+    global current_case, attempts, round_over, unused
     attempts = 0
+    round_over = False
     Element("feedback").write("")
     Element("nextBtn").element.style.display = "none"
-    current_case = random.choice(cases)
-    Element("case").write(f"<div class='quote'>\"{current_case['quote']}\"</div><p>Which stylistic feature is at work here?</p>")
+
+    # pick without immediate repetition if possible
+    if not unused:
+        unused = cases.copy()
+    current_case = random.choice(unused)
+    unused.remove(current_case)
+
+    Element("case").write(
+        f"<div class='quote'>\"{current_case['quote']}\"</div>"
+        "<p>Which stylistic feature is at work here?</p>"
+    )
     suspects = [(current_case["feature"], current_case["effect"])] + current_case["decoys"]
     random.shuffle(suspects)
-    buttons_html = "".join([f"<div class='suspect' onclick='select_suspect(\"{f}\", \"{e}\")'><b>{f}</b><br><small>{e}</small></div>" for f, e in suspects])
-    Element("suspects").write(buttons_html)
 
-def select_suspect(feature, effect):
-    global score, attempts, cases_played
+    # Note: passing only the feature to the click handler (effect text isn’t needed in the callback)
+    buttons_html = "".join([
+        f"<div class='suspect' onclick='select_suspect(\"{f}\")'><b>{f}</b><br><small>{e}</small></div>"
+        for f, e in suspects
+    ])
+    Element("suspects").write(buttons_html)
+    refresh_score()
+
+def select_suspect(feature):
+    global score, attempts, cases_played, round_over
+    if round_over:
+        return  # <-- ignore extra clicks after round ends
+
     attempts += 1
     if feature == current_case["feature"]:
         points = 3 if attempts == 1 else 1
         score += points
         cases_played += 1
-        Element("feedback").write(f"✅ Correct! This is <b>{feature}</b>. Effect: {current_case['effect']} (+{points} points)")
+        round_over = True  # <-- lock the round
+        Element("feedback").write(
+            f"✅ Correct! This is <b>{feature}</b>. Effect: {current_case['effect']} (+{points} points)"
+        )
         Element("nextBtn").element.style.display = "inline-block"
     else:
         if attempts < 2:
-            Element("feedback").write(f"❌ Not quite. Try again.")
+            Element("feedback").write("❌ Not quite. Try again.")
         else:
             cases_played += 1
-            Element("feedback").write(f"❌ Wrong. The answer was <b>{current_case['feature']}</b>. Effect: {current_case['effect']}")
+            round_over = True  # <-- lock the round
+            Element("feedback").write(
+                f"❌ Wrong. The answer was <b>{current_case['feature']}</b>. "
+                f"Effect: {current_case['effect']}"
+            )
             Element("nextBtn").element.style.display = "inline-block"
-    Element("scoreboard").write(f"Score: {score} | Cases solved: {cases_played}")
+    refresh_score()
 
 # Expose to JS so onclick works
-from js import window
 window.select_suspect = select_suspect
 
 def next_case(evt=None):
@@ -207,8 +138,4 @@ def next_case(evt=None):
         load_case()
 
 Element("nextBtn").element.addEventListener("click", next_case)
-
 load_case()
-</py-script>
-</body>
-</html>
